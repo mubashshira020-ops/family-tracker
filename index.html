@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -12,24 +12,43 @@
         import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
+        // Firebase Configuration
         const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'jindal-family-tracker';
 
+        // Global access for standard script
         window.db = db;
         window.appId = appId;
         window.auth = auth;
+        window.firestore = { doc, setDoc, onSnapshot, collection };
 
         const initAuth = async () => {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.error("Auth Connection Failed:", err);
             }
         };
-        initAuth();
+
+        // Listen for Auth State
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                console.log("Tracker Ready for:", user.uid);
+                // Profile load logic
+                if (window.changeMember) {
+                    window.changeMember(window.currentMember || 'Kapil Jindal');
+                }
+            } else {
+                initAuth();
+            }
+        });
     </script>
 
     <style>
@@ -38,92 +57,90 @@
         .gradient-brand { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
         .text-gradient { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .glass-card { background: white; border-radius: 24px; border: 1px solid #f1f5f9; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.04); }
-        .member-btn { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid #e2e8f0; font-weight: 800; }
+        .member-btn { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid #e2e8f0; font-weight: 800; color: #64748b; }
         .member-btn.active { background: #4f46e5; color: white; border-color: #4338ca; transform: translateY(-2px); box-shadow: 0 12px 20px -5px rgba(79, 70, 229, 0.4); }
-        input, select { border: 1.5px solid #e2e8f0; padding: 0.85rem; border-radius: 14px; width: 100%; font-weight: 600; outline: none; transition: all 0.2s; }
+        input, select { border: 1.5px solid #e2e8f0; padding: 0.85rem; border-radius: 14px; width: 100%; font-weight: 600; outline: none; transition: all 0.2s; background: white; }
         input:focus { border-color: #4f46e5; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="pb-20">
-    <!-- Navbar -->
+    <!-- Top Navigation -->
     <nav class="bg-white/80 backdrop-blur-md border-b border-slate-100 py-5 px-6 sticky top-0 z-50">
-        <div class="max-w-5xl mx-auto flex justify-between items-center">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
             <div class="flex items-center gap-4">
                 <div class="gradient-brand p-2.5 rounded-2xl text-white shadow-lg shadow-indigo-200">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                 </div>
                 <div>
                     <h1 class="text-xl font-900 text-gradient tracking-tight">Jindal Family</h1>
-                    <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Activity Hub v2.0</p>
+                    <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Personal Productivity v3.2</p>
                 </div>
             </div>
         </div>
     </nav>
 
-    <main class="max-w-5xl mx-auto p-4 md:p-6 mt-4">
-        <!-- Profile Switcher -->
+    <main class="max-w-6xl mx-auto p-4 md:p-6 mt-4">
+        <!-- Profile Selection Bar -->
         <div class="flex gap-3 mb-10 overflow-x-auto pb-4 no-scrollbar">
-            <button onclick="changeMember('Kapil Jindal')" id="tabKapil" class="member-btn active px-8 py-4 rounded-2xl text-sm whitespace-nowrap bg-white shadow-sm">Kapil Jindal</button>
-            <button onclick="changeMember('Atharva Jindal')" id="tabAtharva" class="member-btn px-8 py-4 rounded-2xl text-sm whitespace-nowrap bg-white shadow-sm">Atharva Jindal</button>
-            <button onclick="changeMember('Rinky Jindal')" id="tabRinky" class="member-btn px-8 py-4 rounded-2xl text-sm whitespace-nowrap bg-white shadow-sm">Rinky Jindal</button>
+            <button onclick="changeMember('Kapil Jindal')" class="member-btn active px-8 py-4 rounded-2xl text-sm whitespace-nowrap bg-white shadow-sm">Kapil Jindal</button>
+            <button onclick="changeMember('Atharva Jindal')" class="member-btn px-8 py-4 rounded-2xl text-sm whitespace-nowrap bg-white shadow-sm">Atharva Jindal</button>
+            <button onclick="changeMember('Rinky Jindal')" class="member-btn px-8 py-4 rounded-2xl text-sm whitespace-nowrap bg-white shadow-sm">Rinky Jindal</button>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <!-- Entry Form -->
-            <div class="lg:col-span-5">
-                <div class="glass-card p-8">
-                    <div class="flex items-center justify-between mb-8">
-                        <h2 id="formName" class="text-3xl font-900 text-slate-900 tracking-tighter">Kapil Jindal</h2>
-                        <span class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-[10px] font-900 uppercase">Live Sync</span>
-                    </div>
-                    
+            <!-- Left Side: Data Entry Form -->
+            <div class="lg:col-span-4">
+                <div class="glass-card p-8 sticky top-28">
+                    <h2 id="formName" class="text-2xl font-900 text-slate-900 mb-6 tracking-tighter">Kapil Jindal</h2>
                     <form id="entryForm" class="space-y-6">
                         <div class="space-y-1.5">
-                            <label class="text-[10px] font-900 text-slate-400 uppercase tracking-widest ml-1">Date</label>
+                            <label class="text-[10px] font-900 text-slate-400 uppercase tracking-widest ml-1">Log Date</label>
                             <input type="date" id="entryDate" required>
                         </div>
-                        
                         <div class="space-y-1.5">
                             <label class="text-[10px] font-900 text-slate-400 uppercase tracking-widest ml-1">Activity</label>
                             <select id="category" required onchange="updateHint()"></select>
                         </div>
-                        
                         <div class="space-y-1.5">
-                            <label class="text-[10px] font-900 text-slate-400 uppercase tracking-widest ml-1">Result / Value</label>
-                            <input type="text" id="value" placeholder="e.g. 45 or 1 glass" required>
-                            <div class="flex items-center gap-2 mt-2 px-1">
-                                <p id="hint" class="text-[10px] font-bold text-indigo-600 uppercase italic"></p>
-                            </div>
+                            <label class="text-[10px] font-900 text-slate-400 uppercase tracking-widest ml-1">Value / Result</label>
+                            <input type="text" id="value" placeholder="Enter amount..." required>
+                            <p id="hint" class="text-[10px] font-bold text-indigo-600 uppercase mt-1"></p>
                         </div>
-                        
                         <button type="submit" id="submitBtn" class="w-full gradient-brand text-white font-900 py-5 rounded-2xl shadow-xl shadow-indigo-100 hover:opacity-90 active:scale-95 transition-all">Log Activity</button>
                     </form>
                 </div>
             </div>
 
-            <!-- Dashboard -->
-            <div class="lg:col-span-7 space-y-8">
+            <!-- Right Side: Analytics & History -->
+            <div class="lg:col-span-8 space-y-8">
+                <!-- Visual Summary -->
                 <div class="glass-card p-8">
-                    <h3 class="text-xs font-900 text-slate-400 uppercase tracking-widest mb-6">Activity Breakdown</h3>
-                    <div class="h-80"><canvas id="mainChart"></canvas></div>
+                    <h3 class="text-xs font-900 text-slate-400 uppercase tracking-widest mb-6">Weekly Distribution</h3>
+                    <div class="h-64"><canvas id="mainChart"></canvas></div>
                 </div>
 
+                <!-- Detailed History Table -->
                 <div class="glass-card overflow-hidden">
                     <div class="p-6 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
-                        <h3 class="text-[10px] font-900 text-slate-500 uppercase tracking-widest">Recent Logs</h3>
-                        <span id="logCount" class="bg-white border border-slate-200 text-slate-600 text-[9px] font-900 px-3 py-1 rounded-full">0 Items</span>
+                        <div>
+                            <h3 class="text-sm font-900 text-slate-800">History & Reports</h3>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Scroll for more logs</p>
+                        </div>
+                        <span id="logCount" class="bg-indigo-600 text-white text-[10px] font-900 px-3 py-1 rounded-full">0 Entries</span>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left">
-                            <thead class="bg-slate-50/20 text-[10px] font-900 text-slate-400 uppercase">
+                            <thead class="bg-slate-50/30 text-[10px] font-900 text-slate-400 uppercase">
                                 <tr>
-                                    <th class="px-8 py-5">Date</th>
-                                    <th class="px-8 py-5">Activity</th>
-                                    <th class="px-8 py-5 text-right">Value</th>
+                                    <th class="px-8 py-4">Date</th>
+                                    <th class="px-8 py-4">Activity</th>
+                                    <th class="px-8 py-4 text-right">Value</th>
                                 </tr>
                             </thead>
-                            <tbody id="logTable" class="text-sm divide-y divide-slate-50"></tbody>
+                            <tbody id="logTable" class="text-sm divide-y divide-slate-50">
+                                <!-- Logs will appear here dynamically -->
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -131,85 +148,101 @@
         </div>
     </main>
 
-    <script type="module">
-        import { doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
-        let currentMember = 'Kapil Jindal';
+    <script>
+        window.currentMember = 'Kapil Jindal';
         let chart = null;
         let unsubscribe = null;
 
         const config = {
-            'Kapil Jindal': { 'Mobile Time': 'min', 'TV Time': 'min', 'Physical Activity': 'min', 'Family Time': 'min', 'Coco Time': 'min', 'Hookah': 'dur', 'Cigarette': 'qty', 'Alcohol': 'qty', 'Junk Food': 'qty', 'Sleep': 'hrs', 'Reading': 'min', 'Self-Improvement': 'min' },
-            'Atharva Jindal': { 'Mobile Time': 'min', 'TV Time': 'min', 'Junk Food': 'qty', 'Self Study': 'min', 'Classwork/Homework': 'min', 'Physical Activity': 'min', 'Coco Time': 'min', 'Family Time': 'min' },
+            'Kapil Jindal': { 'Mobile Time': 'min', 'TV Time': 'min', 'Physical Activity': 'min', 'Family Time': 'min', 'Coco Time': 'min', 'Hookah': 'dur', 'Cigarette': 'count', 'Alcohol': 'qty', 'Junk Food': 'qty', 'Sleep': 'hrs', 'Reading': 'min', 'Self-Improvement': 'min' },
+            'Atharva Jindal': { 'Mobile Time': 'min', 'TV Time': 'min', 'Junk Food': 'qty', 'Self Study': 'min', 'Classwork': 'min', 'Physical Activity': 'min', 'Coco Time': 'min', 'Family Time': 'min' },
             'Rinky Jindal': { 'Mobile Time': 'min', 'TV Time': 'min', 'Physical Activity': 'min', 'Family Time': 'min', 'Coco Time': 'min', 'Hookah': 'dur', 'Alcohol': 'qty', 'Junk Food': 'qty', 'Zoho Review': 'min', 'Runo Review': 'min', 'Ad Word Review': 'min', 'Office Meeting': 'min' }
         };
 
         window.changeMember = (name) => {
-            currentMember = name;
-            document.querySelectorAll('.member-btn').forEach(b => b.classList.toggle('active', b.innerText === name));
+            window.currentMember = name;
+            // UI Button styling
+            document.querySelectorAll('.member-btn').forEach(b => {
+                b.classList.toggle('active', b.innerText.trim() === name);
+            });
             document.getElementById('formName').innerText = name;
+            
+            // Dropdown options
             const select = document.getElementById('category');
             select.innerHTML = Object.keys(config[name]).map(c => `<option value="${c}">${c}</option>`).join('');
+            
             window.updateHint();
             syncData();
         };
 
         window.updateHint = () => {
             const cat = document.getElementById('category').value;
-            document.getElementById('hint').innerText = `Unit: ${config[currentMember][cat]}`;
+            if (config[window.currentMember] && config[window.currentMember][cat]) {
+                document.getElementById('hint').innerText = `Recommended Unit: ${config[window.currentMember][cat]}`;
+            }
         };
 
         function syncData() {
+            // Check if Firebase is ready
+            if (!window.db || !window.auth.currentUser) {
+                console.log("Waiting for Firebase Connection...");
+                return;
+            }
             if (unsubscribe) unsubscribe();
-            if (!window.auth.currentUser) return;
 
-            const collectionId = `logs_${currentMember.replace(/\s/g, '_')}`;
-            const q = collection(window.db, 'artifacts', window.appId, 'public', 'data', collectionId);
+            const collId = `logs_${window.currentMember.replace(/\s/g, '_')}`;
+            const q = window.firestore.collection(window.db, 'artifacts', window.appId, 'public', 'data', collId);
             
-            unsubscribe = onSnapshot(q, (snapshot) => {
+            unsubscribe = window.firestore.onSnapshot(q, (snapshot) => {
                 const logs = [];
                 snapshot.forEach(doc => logs.push(doc.data()));
-                updateUI(logs);
-            }, (error) => console.error("Firestore Error:", error));
+                renderUI(logs);
+            }, (error) => {
+                console.error("Firestore sync failed:", error);
+            });
         }
 
-        function updateUI(logs) {
+        function renderUI(logs) {
+            // Sort by Date (newest first)
             const sorted = logs.sort((a,b) => new Date(b.date) - new Date(a.date));
             document.getElementById('logCount').innerText = `${logs.length} Entries`;
+            const table = document.getElementById('logTable');
             
-            document.getElementById('logTable').innerHTML = sorted.slice(0, 15).map(l => `
-                <tr class="hover:bg-slate-50 transition-all">
-                    <td class="px-8 py-5 font-bold text-slate-400 text-[11px] whitespace-nowrap">${l.date.split('-').reverse().slice(0,2).join('/')}</td>
-                    <td class="px-8 py-5 font-800 text-slate-800">${l.category}</td>
-                    <td class="px-8 py-5 text-right"><span class="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl font-900 text-[11px] ring-1 ring-indigo-100">${l.value}</span></td>
-                </tr>
-            `).join('') || '<tr><td colspan="3" class="p-20 text-center text-slate-300 font-900 uppercase text-[10px] tracking-widest">No Logs Yet</td></tr>';
-
-            renderChart(logs);
+            if(sorted.length === 0) {
+                table.innerHTML = '<tr><td colspan="3" class="p-16 text-center text-slate-300 font-bold uppercase text-[10px] tracking-widest">No Data Found</td></tr>';
+            } else {
+                table.innerHTML = sorted.map(l => `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-8 py-5 font-bold text-slate-400 text-[11px]">${l.date.split('-').reverse().join('/')}</td>
+                        <td class="px-8 py-5 font-800 text-slate-700">${l.category}</td>
+                        <td class="px-8 py-5 text-right"><span class="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg font-900 text-xs">${l.value}</span></td>
+                    </tr>
+                `).join('');
+            }
+            updateChart(logs);
         }
 
-        function renderChart(logs) {
-            const totals = {};
+        function updateChart(logs) {
+            const summary = {};
             logs.forEach(l => {
                 const val = parseFloat(l.value.replace(/[^0-9.]/g, '')) || 1;
-                totals[l.category] = (totals[l.category] || 0) + val;
+                summary[l.category] = (summary[l.category] || 0) + val;
             });
             
             const ctx = document.getElementById('mainChart').getContext('2d');
             if (chart) chart.destroy();
             chart = new Chart(ctx, {
                 type: 'bar',
-                data: { labels: Object.keys(totals), datasets: [{ data: Object.values(totals), backgroundColor: '#6366f1', borderRadius: 8, barThickness: 20 }] },
+                data: { labels: Object.keys(summary), datasets: [{ data: Object.values(summary), backgroundColor: '#6366f1', borderRadius: 6 }] },
                 options: { 
                     indexAxis: 'y', 
-                    plugins: { legend: { display: false } },
-                    responsive: true,
+                    plugins: { legend: { display: false } }, 
+                    responsive: true, 
                     maintainAspectRatio: false,
-                    scales: { 
-                        x: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10, weight: '700' }, color: '#94a3b8' } }, 
-                        y: { grid: { display: false }, ticks: { font: { size: 11, weight: '800' }, color: '#475569' } } 
-                    } 
+                    scales: {
+                        x: { grid: { color: '#f8fafc' }, ticks: { font: { size: 10 } } },
+                        y: { grid: { display: false }, ticks: { font: { size: 11, weight: 'bold' } } }
+                    }
                 }
             });
         }
@@ -217,23 +250,37 @@
         document.getElementById('entryForm').onsubmit = async (e) => {
             e.preventDefault();
             const btn = document.getElementById('submitBtn');
-            btn.innerText = "Syncing...";
+            const originalText = btn.innerText;
+            btn.innerText = "Saving to Cloud...";
             btn.disabled = true;
 
-            const id = Date.now().toString();
-            const entry = { id, date: document.getElementById('entryDate').value, category: document.getElementById('category').value, value: document.getElementById('value').value };
-            const collectionId = `logs_${currentMember.replace(/\s/g, '_')}`;
-            
+            const entry = {
+                id: Date.now().toString(),
+                date: document.getElementById('entryDate').value,
+                category: document.getElementById('category').value,
+                value: document.getElementById('value').value
+            };
+
+            const collId = `logs_${window.currentMember.replace(/\s/g, '_')}`;
             try {
-                await setDoc(doc(window.db, 'artifacts', window.appId, 'public', 'data', collectionId, id), entry);
+                const docRef = window.firestore.doc(window.db, 'artifacts', window.appId, 'public', 'data', collId, entry.id);
+                await window.firestore.setDoc(docRef, entry);
                 document.getElementById('value').value = '';
-            } catch (err) { console.error(err); }
-            
-            btn.innerText = "Log Activity";
-            btn.disabled = false;
+                btn.innerText = "Saved Successfully!";
+                btn.classList.replace('gradient-brand', 'bg-emerald-500');
+                
+                setTimeout(() => { 
+                    btn.innerText = originalText; 
+                    btn.classList.replace('bg-emerald-500', 'gradient-brand');
+                    btn.disabled = false; 
+                }, 1500);
+            } catch (err) {
+                btn.innerText = "Error Saving!";
+                btn.disabled = false;
+            }
         };
 
-        onAuthStateChanged(window.auth, (u) => { if (u) window.changeMember(currentMember); });
+        // Set Today's Date as Default
         document.getElementById('entryDate').valueAsDate = new Date();
     </script>
 </body>
