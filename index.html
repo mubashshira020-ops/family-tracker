@@ -1,21 +1,224 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jindal Family Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyCbAW-YTMuCt2q_dW4wyjzSa8UgQjOb96Q",
-  authDomain: "family-782ba.firebaseapp.com",
-  projectId: "family-782ba",
-  storageBucket: "family-782ba.firebasestorage.app",
-  messagingSenderId: "733262064918",
-  appId: "1:733262064918:web:0321d05a994b2198ba7437",
-  measurementId: "G-66CFCKT68F"
-};
+        // Aapki verified config
+        const firebaseConfig = {
+            apiKey: "AIzaSyCbAW-YTMuCt2q_dW4wyjzSa8UgQjOb96Q",
+            authDomain: "family-782ba.firebaseapp.com",
+            projectId: "family-782ba",
+            storageBucket: "family-782ba.firebasestorage.app",
+            messagingSenderId: "733262064918",
+            appId: "1:733262064918:web:0321d05a994b2198ba7437",
+            measurementId: "G-66FCKT68F"
+        };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = "family-782ba";
+
+        // Firebase Functions
+        window.saveData = async (entry) => {
+            if (!auth.currentUser) {
+                alert("Authentication fail! Please enable Anonymous Auth in Firebase Console.");
+                return;
+            }
+            try {
+                const collId = `logs_${window.currentMember.replace(/\s/g, '_')}`;
+                // Path following Rule 1: /artifacts/{appId}/public/data/{collectionName}/{docId}
+                const ref = doc(db, 'artifacts', appId, 'public', 'data', collId, entry.id);
+                await setDoc(ref, entry);
+            } catch (e) {
+                console.error("Save error:", e);
+                alert("Data save nahi hua: " + e.message);
+            }
+        };
+
+        window.listenData = (callback) => {
+            if (!auth.currentUser) return;
+            const collId = `logs_${window.currentMember.replace(/\s/g, '_')}`;
+            const ref = collection(db, 'artifacts', appId, 'public', 'data', collId);
+            return onSnapshot(ref, (snap) => {
+                const data = [];
+                snap.forEach(d => data.push(d.data()));
+                callback(data);
+            }, (err) => console.error("Listen Error:", err));
+        };
+
+        const startAuth = async () => {
+            try {
+                await signInAnonymously(auth);
+            } catch (error) {
+                console.error("Auth Failed:", error);
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (!user) startAuth();
+            else if (window.initTracker) window.initTracker();
+        });
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap');
+        body { background-color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .card { background: white; border-radius: 20px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; }
+        .btn-member { padding: 0.8rem 1.2rem; border-radius: 12px; font-weight: 800; transition: all 0.3s; font-size: 0.9rem; }
+        .active { background: #4f46e5; color: white; transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4); }
+        .inactive { background: white; color: #64748b; border: 1px solid #e2e8f0; }
+        input, select { width: 100%; padding: 0.8rem; border-radius: 12px; border: 1.5px solid #e2e8f0; outline: none; transition: 0.2s; font-weight: 600; }
+        input:focus { border-color: #4f46e5; }
+    </style>
+</head>
+<body class="p-4 md:p-10 max-w-5xl mx-auto">
+    <header class="text-center mb-10">
+        <h1 class="text-4xl font-800 text-slate-900 tracking-tight">Jindal Family Tracker</h1>
+        <p class="text-slate-500 font-medium mt-2">Discipline & Activity Monitoring</p>
+    </header>
+
+    <!-- Selection -->
+    <div class="flex flex-wrap justify-center gap-3 mb-10" id="memberTabs">
+        <button onclick="switchMember('Kapil Jindal')" class="btn-member active">Kapil Jindal</button>
+        <button onclick="switchMember('Atharva Jindal')" class="btn-member inactive">Atharva Jindal</button>
+        <button onclick="switchMember('Rinky Jindal')" class="btn-member inactive">Rinky Jindal</button>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- Form -->
+        <div class="lg:col-span-5 card p-8">
+            <div class="mb-6">
+                <span class="text-xs font-800 text-indigo-600 uppercase tracking-widest">Recording for</span>
+                <h2 id="currentName" class="text-2xl font-800 text-slate-900">Kapil Jindal</h2>
+            </div>
+            
+            <form id="logForm" class="space-y-5">
+                <div>
+                    <label class="text-xs font-700 text-slate-400 uppercase ml-1">Date</label>
+                    <input type="date" id="date" required>
+                </div>
+                <div>
+                    <label class="text-xs font-700 text-slate-400 uppercase ml-1">Activity</label>
+                    <select id="category"></select>
+                </div>
+                <div>
+                    <label class="text-xs font-700 text-slate-400 uppercase ml-1">Value (Min/Qty)</label>
+                    <input type="text" id="value" placeholder="e.g. 30" required>
+                </div>
+                <button type="submit" id="saveBtn" class="w-full bg-slate-900 text-white py-4 rounded-xl font-800 hover:bg-indigo-600 transition-all shadow-lg">Save Record</button>
+            </form>
+        </div>
+
+        <!-- Chart -->
+        <div class="lg:col-span-7 card p-8">
+            <h3 class="text-sm font-800 text-slate-400 uppercase tracking-widest mb-6">Activity Summary</h3>
+            <div class="h-64">
+                <canvas id="statsChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- History -->
+    <div class="card mt-10 overflow-hidden">
+        <div class="p-6 bg-slate-50 border-b flex justify-between items-center">
+            <h3 class="text-sm font-800 text-slate-800">Recent Logs</h3>
+            <span id="logCount" class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-800">0 Logs</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50 text-[10px] font-800 text-slate-400 uppercase">
+                    <tr>
+                        <th class="px-8 py-4">Date</th>
+                        <th class="px-8 py-4">Activity</th>
+                        <th class="px-8 py-4 text-right">Value</th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody" class="divide-y divide-slate-100 text-sm"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        window.currentMember = "Kapil Jindal";
+        let chart = null;
+        let unsub = null;
+
+        const cats = {
+            'Kapil Jindal': ['Mobile Time', 'TV Time', 'Physical Activity', 'Hookah', 'Cigarette', 'Alcohol', 'Junk Food', 'Sleep'],
+            'Atharva Jindal': ['Mobile Time', 'TV Time', 'Self Study', 'Classwork', 'Physical Activity', 'Junk Food'],
+            'Rinky Jindal': ['Mobile Time', 'TV Time', 'Physical Activity', 'Zoho Review', 'Office Meeting', 'Junk Food']
+        };
+
+        window.switchMember = (name) => {
+            window.currentMember = name;
+            document.getElementById('currentName').innerText = name;
+            document.querySelectorAll('.btn-member').forEach(btn => {
+                btn.classList.toggle('active', btn.innerText === name);
+                btn.classList.toggle('inactive', btn.innerText !== name);
+            });
+            document.getElementById('category').innerHTML = cats[name].map(c => `<option value="${c}">${c}</option>`).join('');
+            startSync();
+        };
+
+        function startSync() {
+            if (unsub) unsub();
+            if (window.listenData) unsub = window.listenData(updateUI);
+        }
+
+        function updateUI(logs) {
+            const sorted = logs.sort((a,b) => new Date(b.date) - new Date(a.date));
+            document.getElementById('logCount').innerText = `${logs.length} Logs`;
+            document.getElementById('historyBody').innerHTML = sorted.map(l => `
+                <tr class="hover:bg-slate-50">
+                    <td class="px-8 py-4 font-bold text-slate-400">${l.date}</td>
+                    <td class="px-8 py-4 font-800 text-slate-700">${l.category}</td>
+                    <td class="px-8 py-4 text-right font-800 text-indigo-600">${l.value}</td>
+                </tr>
+            `).join('') || '<tr><td colspan="3" class="p-8 text-center text-slate-300 font-bold">No Data Found</td></tr>';
+
+            const summary = {};
+            logs.forEach(l => summary[l.category] = (summary[l.category] || 0) + (parseFloat(l.value) || 1));
+            
+            const ctx = document.getElementById('statsChart').getContext('2d');
+            if (chart) chart.destroy();
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: Object.keys(summary), datasets: [{ data: Object.values(summary), backgroundColor: '#4f46e5', borderRadius: 8 }] },
+                options: { indexAxis: 'y', plugins: { legend: { display: false } }, maintainAspectRatio: false }
+            });
+        }
+
+        document.getElementById('logForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = true; btn.innerText = "Saving...";
+            
+            const entry = {
+                id: Date.now().toString(),
+                date: document.getElementById('date').value,
+                category: document.getElementById('category').value,
+                value: document.getElementById('value').value
+            };
+            
+            await window.saveData(entry);
+            document.getElementById('value').value = '';
+            btn.disabled = false; btn.innerText = "Save Record";
+        };
+
+        window.initTracker = () => {
+            document.getElementById('date').valueAsDate = new Date();
+            window.switchMember('Kapil Jindal');
+        };
+    </script>
+</body>
+</html>
