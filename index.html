@@ -1,20 +1,336 @@
-function doPost(e) {
-  try {
-    var data = JSON.parse(e.postData.contents);
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jindal Family Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     
-    sheet.appendRow([
-      data.id,
-      new Date().toLocaleString(),
-      data.member,
-      data.date,
-      data.category,
-      data.val,
-      data.display
-    ]);
-    
-    return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
-  } catch (err) {
-    return ContentService.createTextOutput("Error: " + err.message).setMimeType(ContentService.MimeType.TEXT);
-  }
-}
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCbAW-YTMuCt2q_dW4wyjzSa8UgQjOb96Q",
+            authDomain: "family-782ba.firebaseapp.com",
+            projectId: "family-782ba",
+            storageBucket: "family-782ba.firebasestorage.app",
+            messagingSenderId: "733262064918",
+            appId: "1:733262064918:web:0321d05a994b2198ba7437"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = "family-782ba";
+
+        window.allLogs = { 'Kapil Jindal': [], 'Atharva Jindal': [], 'Rinky Jindal': [] };
+        window.currentMember = 'Kapil Jindal';
+
+        window.saveData = async (entry) => {
+            if (!auth.currentUser) return;
+            const collId = `logs_${window.currentMember.replace(/\s/g, '_')}`;
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', collId, entry.id), entry);
+        };
+
+        window.deleteEntry = async (id) => {
+            const collId = `logs_${window.currentMember.replace(/\s/g, '_')}`;
+            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', collId, id));
+        };
+
+        window.listenAll = () => {
+            ['Kapil Jindal', 'Atharva Jindal', 'Rinky Jindal'].forEach(m => {
+                const collId = `logs_${m.replace(/\s/g, '_')}`;
+                onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', collId), (snap) => {
+                    const data = [];
+                    snap.forEach(d => data.push(d.data()));
+                    window.allLogs[m] = data;
+                    if (window.currentMember === m) window.updateUI();
+                    if (document.getElementById('weeklyModal').classList.contains('active')) window.renderWeeklyReport();
+                });
+            });
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (!user) signInAnonymously(auth);
+            else {
+                window.listenAll();
+                window.initApp();
+            }
+        });
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; color: #1e293b; }
+        .nav-tab.active { background: #4f46e5; color: white; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3); }
+        .glass-card { background: white; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4); z-index: 50; backdrop-filter: blur(8px); align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .report-table th { background: #1e293b; color: white; font-size: 10px; padding: 12px; text-transform: uppercase; font-weight: 800; }
+        .report-table td { border-bottom: 1px solid #f1f5f9; padding: 12px; font-size: 11px; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="p-4 md:p-8 max-w-7xl mx-auto">
+
+    <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-6">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-black shadow-lg text-xl">JF</div>
+            <div>
+                <h1 class="text-xl font-800 tracking-tight">Jindal Tracker</h1>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Efficiency & Discipline</p>
+            </div>
+        </div>
+
+        <nav class="flex bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm overflow-x-auto no-scrollbar">
+            <button onclick="switchMember('Kapil Jindal')" id="tab-Kapil" class="nav-tab px-6 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap">Kapil</button>
+            <button onclick="switchMember('Atharva Jindal')" id="tab-Atharva" class="nav-tab px-6 py-2.5 rounded-xl text-xs font-bold transition-all text-slate-500 whitespace-nowrap">Atharva</button>
+            <button onclick="switchMember('Rinky Jindal')" id="tab-Rinky" class="nav-tab px-6 py-2.5 rounded-xl text-xs font-bold transition-all text-slate-500 whitespace-nowrap">Rinky</button>
+        </nav>
+
+        <button onclick="showWeeklyModal()" class="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-xl flex items-center gap-2 hover:bg-black transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Weekly Report
+        </button>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div class="lg:col-span-4">
+            <div class="glass-card p-8">
+                <h2 class="text-xs font-800 text-slate-400 uppercase tracking-widest mb-6">New Log: <span id="formTitle" class="text-indigo-600"></span></h2>
+                <form id="logForm" class="space-y-5">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">Date</label>
+                        <input type="date" id="logDate" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm outline-none ring-1 ring-slate-100">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">Select Activity</label>
+                        <select id="logCategory" onchange="updateInputs()" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm outline-none ring-1 ring-slate-100 cursor-pointer"></select>
+                    </div>
+                    <div id="inputSection" class="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-3">
+                        <label id="inputLabel" class="text-[10px] font-black text-indigo-400 uppercase">Values</label>
+                        <div id="timeInputs" class="grid grid-cols-2 gap-4">
+                            <input type="number" id="valH" placeholder="Hours" class="p-4 rounded-xl font-bold text-sm outline-none text-center border border-white">
+                            <input type="number" id="valM" placeholder="Mins" class="p-4 rounded-xl font-bold text-sm outline-none text-center border border-white">
+                        </div>
+                        <input type="number" id="valQty" placeholder="Enter Quantity" class="hidden w-full p-4 rounded-xl font-bold text-sm outline-none text-center border border-white">
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 text-white py-5 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all">Save Activity</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="lg:col-span-8 space-y-6">
+            <div id="statsRow" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+            <div class="glass-card overflow-hidden">
+                <div class="px-8 py-5 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
+                    <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Today's Activity</h3>
+                    <span id="logCount" class="text-[10px] font-bold text-indigo-600">0 Items</span>
+                </div>
+                <div class="max-h-[400px] overflow-y-auto no-scrollbar">
+                    <table class="w-full text-left">
+                        <tbody id="historyBody" class="divide-y divide-slate-50"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="weeklyModal" class="modal">
+        <div class="bg-white w-[98%] max-w-[1100px] h-[90vh] rounded-[32px] flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-8 border-b flex justify-between items-center bg-white z-10">
+                <div>
+                    <h2 class="text-xl font-800 text-slate-800">Performance Matrix</h2>
+                    <p id="weekRangeLabel" class="text-[10px] font-black text-indigo-600 uppercase mt-1"></p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button onclick="changeWeek(-7)" class="p-3 bg-slate-50 rounded-full hover:bg-slate-100">←</button>
+                    <input type="date" id="reportDate" onchange="renderWeeklyReport()" class="font-bold text-xs bg-slate-50 px-4 py-2 rounded-xl outline-none border border-slate-200">
+                    <button onclick="changeWeek(7)" class="p-3 bg-slate-50 rounded-full hover:bg-slate-100">→</button>
+                    <button onclick="closeWeeklyModal()" class="ml-4 text-slate-300 hover:text-red-500 font-bold text-xl transition-colors">✕</button>
+                </div>
+            </div>
+            <div id="weeklyContainer" class="flex-1 overflow-auto p-8 space-y-12 bg-slate-50/50"></div>
+        </div>
+    </div>
+
+    <script>
+        const config = {
+            'Kapil Jindal': [
+                { name: 'Mobile Time', icon: '📱', type: 'min' },
+                { name: 'TV Time', icon: '📺', type: 'min' },
+                { name: 'Physical Activity', icon: '🏃', type: 'min' },
+                { name: 'Family Time', icon: '👨‍👩‍👧‍👦', type: 'min' },
+                { name: 'Coco Time', icon: '🐕', type: 'min' },
+                { name: 'Hookah', icon: '💨', type: 'min' },
+                { name: 'Cigarette', icon: '🚬', type: 'qty', label: 'Pcs' },
+                { name: 'Alcohol', icon: '🍺', type: 'qty', label: 'Times' },
+                { name: 'Junk Food', icon: '🍕', type: 'qty', label: 'Items' },
+                { name: 'Sleep', icon: '😴', type: 'min' },
+                { name: 'Reading', icon: '📖', type: 'min' },
+                { name: 'Self-Improvement', icon: '🚀', type: 'min' }
+            ],
+            'Atharva Jindal': [
+                { name: 'Mobile Time', icon: '📱', type: 'min' },
+                { name: 'TV Time', icon: '📺', type: 'min' },
+                { name: 'Junk Food', icon: '🍕', type: 'qty', label: 'Items' },
+                { name: 'Self Study', icon: '📚', type: 'min' },
+                { name: 'Homework', icon: '✍️', type: 'min' },
+                { name: 'Physical Activity', icon: '⚽', type: 'min' },
+                { name: 'Coco Time', icon: '🐕', type: 'min' },
+                { name: 'Family Time', icon: '👨‍👩‍👧‍👦', type: 'min' }
+            ],
+            'Rinky Jindal': [
+                { name: 'Ad Word / Keyword Planner', icon: '🎯', type: 'min' },
+                { name: 'Zoho Review', icon: '📊', type: 'min' },
+                { name: 'Runo Review', icon: '📈', type: 'min' },
+                { name: 'Office Work', icon: '💼', type: 'min' },
+                { name: 'Mobile Time', icon: '📱', type: 'min' },
+                { name: 'TV Time', icon: '📺', type: 'min' },
+                { name: 'Physical Activity', icon: '🧘', type: 'min' },
+                { name: 'Family Time', icon: '👨‍👩‍👧‍👦', type: 'min' },
+                { name: 'Coco Time', icon: '🐕', type: 'min' },
+                { name: 'Hookah', icon: '💨', type: 'min' },
+                { name: 'Alcohol', icon: '🍷', type: 'qty', label: 'Times' },
+                { name: 'Junk Food', icon: '🍕', type: 'qty', label: 'Items' }
+            ]
+        };
+
+        window.initApp = () => {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('logDate').value = today;
+            document.getElementById('reportDate').value = today;
+            switchMember('Kapil Jindal');
+        };
+
+        window.switchMember = (name) => {
+            window.currentMember = name;
+            document.getElementById('formTitle').innerText = name.split(' ')[0].toUpperCase();
+            ['Kapil', 'Atharva', 'Rinky'].forEach(m => {
+                const b = document.getElementById(`tab-${m}`);
+                if(b) name.includes(m) ? b.classList.add('active') : b.classList.remove('active');
+            });
+            const sel = document.getElementById('logCategory');
+            sel.innerHTML = config[name].map(c => `<option value="${c.name}">${c.icon} ${c.name}</option>`).join('');
+            updateInputs();
+            window.updateUI();
+        };
+
+        window.updateInputs = () => {
+            const catName = document.getElementById('logCategory').value;
+            const cat = config[window.currentMember].find(c => c.name === catName);
+            if(!cat) return;
+            document.getElementById('timeInputs').style.display = cat.type === 'min' ? 'grid' : 'none';
+            document.getElementById('valQty').style.display = cat.type === 'qty' ? 'block' : 'none';
+            document.getElementById('inputLabel').innerText = cat.type === 'min' ? 'Duration (Hrs/Min)' : `Quantity (${cat.label})`;
+        };
+
+        window.updateUI = () => {
+            const logs = window.allLogs[window.currentMember] || [];
+            const today = document.getElementById('logDate').value;
+            const todayLogs = logs.filter(l => l.date === today);
+
+            const stats = {};
+            todayLogs.forEach(l => stats[l.category] = (stats[l.category] || 0) + l.val);
+            
+            document.getElementById('statsRow').innerHTML = config[window.currentMember].slice(0, 4).map(c => {
+                const v = stats[c.name] || 0;
+                const disp = c.type === 'min' ? Math.floor(v/60)+'h '+(v%60)+'m' : v+' '+(c.label||'');
+                return `<div class="glass-card p-5 border-l-4 border-indigo-600"><p class="text-[9px] font-black text-slate-400 uppercase mb-1">${c.name}</p><p class="text-lg font-800 text-indigo-700">${disp}</p></div>`;
+            }).join('');
+
+            document.getElementById('logCount').innerText = `${todayLogs.length} Entries`;
+            document.getElementById('historyBody').innerHTML = todayLogs.sort((a,b) => b.timestamp.localeCompare(a.timestamp)).map(l => `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-8 py-4 font-bold text-slate-700 text-xs">${l.category}</td>
+                    <td class="px-8 py-4 font-black text-indigo-600 text-sm text-right">${l.display}</td>
+                    <td class="px-4 py-4 text-center"><button onclick="deleteEntry('${l.id}')" class="text-slate-200 hover:text-red-400 p-2">✕</button></td>
+                </tr>
+            `).join('');
+        };
+
+        document.getElementById('logForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const cat = config[window.currentMember].find(c => c.name === document.getElementById('logCategory').value);
+            let val = 0, display = "";
+            if (cat.type === 'min') {
+                const h = parseInt(document.getElementById('valH').value) || 0;
+                const m = parseInt(document.getElementById('valM').value) || 0;
+                val = (h * 60) + m; display = `${h}h ${m}m`;
+            } else {
+                val = parseInt(document.getElementById('valQty').value) || 0; display = `${val} ${cat.label}`;
+            }
+            if (val > 0) {
+                await window.saveData({ 
+                    id: Date.now().toString(), 
+                    date: document.getElementById('logDate').value, 
+                    category: cat.name, 
+                    val, 
+                    display, 
+                    timestamp: new Date().toISOString() 
+                });
+                document.getElementById('valH').value = ''; 
+                document.getElementById('valM').value = ''; 
+                document.getElementById('valQty').value = '';
+            }
+        };
+
+        window.showWeeklyModal = () => {
+            window.renderWeeklyReport();
+            document.getElementById('weeklyModal').classList.add('active');
+        };
+        window.closeWeeklyModal = () => document.getElementById('weeklyModal').classList.remove('active');
+        
+        window.changeWeek = (d) => {
+            const date = new Date(document.getElementById('reportDate').value);
+            date.setDate(date.getDate() + d);
+            document.getElementById('reportDate').value = date.toISOString().split('T')[0];
+            window.renderWeeklyReport();
+        };
+
+        window.renderWeeklyReport = () => {
+            const selDate = new Date(document.getElementById('reportDate').value);
+            const start = new Date(selDate); 
+            // Week starts from Monday
+            const day = selDate.getDay();
+            const diff = selDate.getDate() - day + (day === 0 ? -6 : 1);
+            start.setDate(diff);
+
+            const dates = [];
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(start); d.setDate(start.getDate() + i);
+                dates.push({ str: d.toISOString().split('T')[0], label: d.toLocaleDateString('en-US', {weekday:'short'}).toUpperCase(), date: d.getDate() });
+            }
+            document.getElementById('weekRangeLabel').innerText = `WEEK: ${dates[0].str} TO ${dates[6].str}`;
+
+            let html = '';
+            ['Kapil Jindal', 'Atharva Jindal', 'Rinky Jindal'].forEach(m => {
+                const logs = window.allLogs[m] || [];
+                html += `
+                    <div class="mb-10">
+                        <h3 class="bg-indigo-600 inline-block px-8 py-2 rounded-2xl text-white font-black text-[10px] uppercase tracking-widest shadow-lg mb-4 ml-2">${m}</h3>
+                        <div class="glass-card overflow-x-auto">
+                            <table class="w-full report-table min-w-[800px]">
+                                <thead><tr><th class="text-left">Activity</th>${dates.map(d => `<th class="text-center">${d.label}<br>${d.date}</th>`).join('')}<th class="bg-indigo-800">Total</th></tr></thead>
+                                <tbody>`;
+                config[m].forEach(cat => {
+                    let total = 0;
+                    html += `<tr><td class="font-bold text-slate-800 bg-slate-50/50">${cat.icon} ${cat.name}</td>`;
+                    dates.forEach(d => {
+                        const sum = logs.filter(l => l.date === d.str && l.category === cat.name).reduce((s,e) => s+e.val, 0);
+                        total += sum;
+                        const valDisp = sum > 0 ? (cat.type === 'min' ? Math.floor(sum/60)+'h' : sum) : '--';
+                        html += `<td class="text-center font-bold ${sum > 0 ? 'text-indigo-600' : 'text-slate-200'}">${valDisp}</td>`;
+                    });
+                    const finalTotal = total > 0 ? (cat.type === 'min' ? Math.floor(total/60)+'h '+(total%60)+'m' : total) : '0';
+                    html += `<td class="text-center font-black bg-indigo-50 text-indigo-700">${finalTotal}</td></tr>`;
+                });
+                html += `</tbody></table></div></div>`;
+            });
+            document.getElementById('weeklyContainer').innerHTML = html;
+        };
+    </script>
+</body>
+</html>
