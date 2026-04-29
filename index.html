@@ -9,8 +9,9 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, doc, setDoc, onSnapshot, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
+        // Firebase Setup
         const firebaseConfig = {
             apiKey: "AIzaSyCbAW-YTMuCt2q_dW4wyjzSa8UgQjOb96Q",
             authDomain: "family-782ba.firebaseapp.com",
@@ -28,6 +29,7 @@
         window.allLogs = { 'Kapil Jindal': [], 'Atharva Jindal': [], 'Rinky Jindal': [] };
         window.currentMember = 'Kapil Jindal';
 
+        // Data Management
         window.saveData = async (entry) => {
             if (!auth.currentUser) return;
             const collId = `logs_${window.currentMember.replace(/\s/g, '_')}`;
@@ -48,111 +50,130 @@
                     window.allLogs[m] = data;
                     if (window.currentMember === m) window.updateUI();
                     if (document.getElementById('weeklyModal').classList.contains('active')) window.renderWeeklyReport();
-                });
+                }, (err) => console.log("Waiting for data..."));
             });
         };
 
+        // Initialize Authentication
+        const initAuth = async () => {
+            try {
+                await signInAnonymously(auth);
+            } catch (err) {
+                console.error("Auth error:", err);
+            }
+        };
+
         onAuthStateChanged(auth, (user) => {
-            if (!user) signInAnonymously(auth);
-            else {
+            if (user) {
                 window.listenAll();
                 window.initApp();
+            } else {
+                initAuth();
             }
         });
     </script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; color: #1e293b; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; color: #1e293b; overflow-x: hidden; }
         .nav-tab.active { background: #4f46e5; color: white; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3); }
-        .glass-card { background: white; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .modal { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4); z-index: 50; backdrop-filter: blur(8px); align-items: center; justify-content: center; }
+        .glass-card { background: white; border-radius: 24px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); z-index: 50; backdrop-filter: blur(8px); align-items: center; justify-content: center; }
         .modal.active { display: flex; }
-        .report-table th { background: #1e293b; color: white; font-size: 10px; padding: 12px; text-transform: uppercase; font-weight: 800; }
-        .report-table td { border-bottom: 1px solid #f1f5f9; padding: 12px; font-size: 11px; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="p-4 md:p-8 max-w-7xl mx-auto">
 
-    <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-6">
+    <header class="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
         <div class="flex items-center gap-4">
-            <div class="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-black shadow-lg text-xl">JF</div>
+            <div class="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-black shadow-xl text-2xl">JF</div>
             <div>
-                <h1 class="text-xl font-800 tracking-tight">Jindal Tracker</h1>
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Efficiency & Discipline</p>
+                <h1 class="text-2xl font-800 tracking-tight text-slate-900">Jindal Family Tracker</h1>
+                <p class="text-[11px] font-bold text-indigo-500 uppercase tracking-widest">Growth & Productivity</p>
             </div>
         </div>
 
-        <nav class="flex bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm overflow-x-auto no-scrollbar">
-            <button onclick="switchMember('Kapil Jindal')" id="tab-Kapil" class="nav-tab px-6 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap">Kapil</button>
-            <button onclick="switchMember('Atharva Jindal')" id="tab-Atharva" class="nav-tab px-6 py-2.5 rounded-xl text-xs font-bold transition-all text-slate-500 whitespace-nowrap">Atharva</button>
-            <button onclick="switchMember('Rinky Jindal')" id="tab-Rinky" class="nav-tab px-6 py-2.5 rounded-xl text-xs font-bold transition-all text-slate-500 whitespace-nowrap">Rinky</button>
+        <nav class="flex bg-white p-2 rounded-2xl border border-slate-200 shadow-sm overflow-x-auto no-scrollbar max-w-full">
+            <button onclick="switchMember('Kapil Jindal')" id="tab-Kapil" class="nav-tab px-6 py-3 rounded-xl text-xs font-bold transition-all whitespace-nowrap">Kapil</button>
+            <button onclick="switchMember('Atharva Jindal')" id="tab-Atharva" class="nav-tab px-6 py-3 rounded-xl text-xs font-bold transition-all text-slate-500 whitespace-nowrap">Atharva</button>
+            <button onclick="switchMember('Rinky Jindal')" id="tab-Rinky" class="nav-tab px-6 py-3 rounded-xl text-xs font-bold transition-all text-slate-500 whitespace-nowrap">Rinky</button>
         </nav>
 
-        <button onclick="showWeeklyModal()" class="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold text-xs shadow-xl flex items-center gap-2 hover:bg-black transition-all">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            Weekly Report
+        <button onclick="showWeeklyModal()" class="bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold text-xs shadow-2xl flex items-center gap-2 hover:scale-105 transition-all">
+            📊 Weekly Report
         </button>
     </header>
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- Input Form -->
         <div class="lg:col-span-4">
-            <div class="glass-card p-8">
-                <h2 class="text-xs font-800 text-slate-400 uppercase tracking-widest mb-6">New Log: <span id="formTitle" class="text-indigo-600"></span></h2>
-                <form id="logForm" class="space-y-5">
-                    <div class="space-y-1">
+            <div class="glass-card p-8 sticky top-8">
+                <h2 class="text-xs font-800 text-slate-400 uppercase tracking-widest mb-6">New Entry: <span id="formTitle" class="text-indigo-600"></span></h2>
+                <form id="logForm" class="space-y-6">
+                    <div class="space-y-2">
                         <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">Date</label>
-                        <input type="date" id="logDate" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm outline-none ring-1 ring-slate-100">
+                        <input type="date" id="logDate" class="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
                     </div>
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">Select Activity</label>
-                        <select id="logCategory" onchange="updateInputs()" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm outline-none ring-1 ring-slate-100 cursor-pointer"></select>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">Category</label>
+                        <select id="logCategory" onchange="updateInputs()" class="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm outline-none cursor-pointer"></select>
                     </div>
-                    <div id="inputSection" class="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-3">
+                    <div id="inputSection" class="p-6 bg-indigo-50/50 rounded-3xl border border-indigo-100 space-y-4">
                         <label id="inputLabel" class="text-[10px] font-black text-indigo-400 uppercase">Values</label>
                         <div id="timeInputs" class="grid grid-cols-2 gap-4">
-                            <input type="number" id="valH" placeholder="Hours" class="p-4 rounded-xl font-bold text-sm outline-none text-center border border-white">
-                            <input type="number" id="valM" placeholder="Mins" class="p-4 rounded-xl font-bold text-sm outline-none text-center border border-white">
+                            <div class="space-y-1">
+                                <span class="text-[9px] text-indigo-300 font-bold ml-1">HOURS</span>
+                                <input type="number" id="valH" placeholder="0" class="w-full p-4 rounded-xl font-bold text-sm outline-none text-center border-none shadow-sm">
+                            </div>
+                            <div class="space-y-1">
+                                <span class="text-[9px] text-indigo-300 font-bold ml-1">MINS</span>
+                                <input type="number" id="valM" placeholder="0" class="w-full p-4 rounded-xl font-bold text-sm outline-none text-center border-none shadow-sm">
+                            </div>
                         </div>
-                        <input type="number" id="valQty" placeholder="Enter Quantity" class="hidden w-full p-4 rounded-xl font-bold text-sm outline-none text-center border border-white">
+                        <input type="number" id="valQty" placeholder="Enter Quantity" class="hidden w-full p-4 rounded-xl font-bold text-sm outline-none text-center border-none shadow-sm">
                     </div>
-                    <button type="submit" class="w-full bg-indigo-600 text-white py-5 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all">Save Activity</button>
+                    <button type="submit" class="w-full bg-indigo-600 text-white py-5 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-indigo-700 hover:-translate-y-1 transition-all active:scale-95">Save Activity</button>
                 </form>
             </div>
         </div>
 
-        <div class="lg:col-span-8 space-y-6">
+        <!-- Dashboard Content -->
+        <div class="lg:col-span-8 space-y-8">
             <div id="statsRow" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+            
             <div class="glass-card overflow-hidden">
-                <div class="px-8 py-5 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
-                    <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Today's Activity</h3>
-                    <span id="logCount" class="text-[10px] font-bold text-indigo-600">0 Items</span>
+                <div class="px-8 py-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                    <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Recent Logs</h3>
+                    <span id="logCount" class="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-black">0 Items</span>
                 </div>
-                <div class="max-h-[400px] overflow-y-auto no-scrollbar">
+                <div class="max-h-[500px] overflow-y-auto no-scrollbar">
                     <table class="w-full text-left">
-                        <tbody id="historyBody" class="divide-y divide-slate-50"></tbody>
+                        <tbody id="historyBody" class="divide-y divide-slate-50">
+                            <!-- Logs populate here -->
+                        </tbody>
                     </table>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Weekly Matrix Modal -->
     <div id="weeklyModal" class="modal">
-        <div class="bg-white w-[98%] max-w-[1100px] h-[90vh] rounded-[32px] flex flex-col shadow-2xl overflow-hidden">
-            <div class="p-8 border-b flex justify-between items-center bg-white z-10">
+        <div class="bg-white w-[96%] max-w-[1200px] h-[92vh] rounded-[40px] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div class="p-8 border-b flex flex-col md:flex-row justify-between items-center bg-white gap-4">
                 <div>
-                    <h2 class="text-xl font-800 text-slate-800">Performance Matrix</h2>
-                    <p id="weekRangeLabel" class="text-[10px] font-black text-indigo-600 uppercase mt-1"></p>
+                    <h2 class="text-2xl font-800 text-slate-800">Family Performance Matrix</h2>
+                    <p id="weekRangeLabel" class="text-[11px] font-black text-indigo-600 uppercase mt-1 tracking-widest"></p>
                 </div>
-                <div class="flex items-center gap-4">
-                    <button onclick="changeWeek(-7)" class="p-3 bg-slate-50 rounded-full hover:bg-slate-100">←</button>
-                    <input type="date" id="reportDate" onchange="renderWeeklyReport()" class="font-bold text-xs bg-slate-50 px-4 py-2 rounded-xl outline-none border border-slate-200">
-                    <button onclick="changeWeek(7)" class="p-3 bg-slate-50 rounded-full hover:bg-slate-100">→</button>
-                    <button onclick="closeWeeklyModal()" class="ml-4 text-slate-300 hover:text-red-500 font-bold text-xl transition-colors">✕</button>
+                <div class="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl">
+                    <button onclick="changeWeek(-7)" class="p-3 bg-white shadow-sm rounded-xl hover:bg-indigo-50 transition-colors">←</button>
+                    <input type="date" id="reportDate" onchange="renderWeeklyReport()" class="font-bold text-xs bg-transparent px-4 py-2 outline-none">
+                    <button onclick="changeWeek(7)" class="p-3 bg-white shadow-sm rounded-xl hover:bg-indigo-50 transition-colors">→</button>
+                    <button onclick="closeWeeklyModal()" class="ml-4 w-10 h-10 flex items-center justify-center rounded-full bg-slate-200 text-slate-500 hover:bg-red-500 hover:text-white transition-all font-bold">✕</button>
                 </div>
             </div>
-            <div id="weeklyContainer" class="flex-1 overflow-auto p-8 space-y-12 bg-slate-50/50"></div>
+            <div id="weeklyContainer" class="flex-1 overflow-auto p-8 space-y-12 bg-slate-50/30 no-scrollbar"></div>
         </div>
     </div>
 
@@ -202,7 +223,7 @@
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('logDate').value = today;
             document.getElementById('reportDate').value = today;
-            switchMember('Kapil Jindal');
+            window.switchMember('Kapil Jindal');
         };
 
         window.switchMember = (name) => {
@@ -214,7 +235,7 @@
             });
             const sel = document.getElementById('logCategory');
             sel.innerHTML = config[name].map(c => `<option value="${c.name}">${c.icon} ${c.name}</option>`).join('');
-            updateInputs();
+            window.updateInputs();
             window.updateUI();
         };
 
@@ -238,15 +259,15 @@
             document.getElementById('statsRow').innerHTML = config[window.currentMember].slice(0, 4).map(c => {
                 const v = stats[c.name] || 0;
                 const disp = c.type === 'min' ? Math.floor(v/60)+'h '+(v%60)+'m' : v+' '+(c.label||'');
-                return `<div class="glass-card p-5 border-l-4 border-indigo-600"><p class="text-[9px] font-black text-slate-400 uppercase mb-1">${c.name}</p><p class="text-lg font-800 text-indigo-700">${disp}</p></div>`;
+                return `<div class="glass-card p-6 border-l-4 border-indigo-500 shadow-sm"><p class="text-[9px] font-black text-slate-400 uppercase mb-1 tracking-wider">${c.name}</p><p class="text-xl font-800 text-slate-800">${disp}</p></div>`;
             }).join('');
 
             document.getElementById('logCount').innerText = `${todayLogs.length} Entries`;
             document.getElementById('historyBody').innerHTML = todayLogs.sort((a,b) => b.timestamp.localeCompare(a.timestamp)).map(l => `
-                <tr class="hover:bg-slate-50 transition-colors">
-                    <td class="px-8 py-4 font-bold text-slate-700 text-xs">${l.category}</td>
-                    <td class="px-8 py-4 font-black text-indigo-600 text-sm text-right">${l.display}</td>
-                    <td class="px-4 py-4 text-center"><button onclick="deleteEntry('${l.id}')" class="text-slate-200 hover:text-red-400 p-2">✕</button></td>
+                <tr class="hover:bg-slate-50 transition-colors group">
+                    <td class="px-8 py-5 font-bold text-slate-700 text-sm">${l.category}</td>
+                    <td class="px-8 py-5 font-black text-indigo-600 text-sm text-right">${l.display}</td>
+                    <td class="px-4 py-5 text-center"><button onclick="deleteEntry('${l.id}')" class="text-slate-200 group-hover:text-red-400 p-2 transition-colors">✕</button></td>
                 </tr>
             `).join('');
         };
@@ -293,7 +314,6 @@
         window.renderWeeklyReport = () => {
             const selDate = new Date(document.getElementById('reportDate').value);
             const start = new Date(selDate); 
-            // Week starts from Monday
             const day = selDate.getDay();
             const diff = selDate.getDate() - day + (day === 0 ? -6 : 1);
             start.setDate(diff);
@@ -303,29 +323,32 @@
                 const d = new Date(start); d.setDate(start.getDate() + i);
                 dates.push({ str: d.toISOString().split('T')[0], label: d.toLocaleDateString('en-US', {weekday:'short'}).toUpperCase(), date: d.getDate() });
             }
-            document.getElementById('weekRangeLabel').innerText = `WEEK: ${dates[0].str} TO ${dates[6].str}`;
+            document.getElementById('weekRangeLabel').innerText = `${dates[0].str} — ${dates[6].str}`;
 
             let html = '';
             ['Kapil Jindal', 'Atharva Jindal', 'Rinky Jindal'].forEach(m => {
                 const logs = window.allLogs[m] || [];
                 html += `
-                    <div class="mb-10">
-                        <h3 class="bg-indigo-600 inline-block px-8 py-2 rounded-2xl text-white font-black text-[10px] uppercase tracking-widest shadow-lg mb-4 ml-2">${m}</h3>
-                        <div class="glass-card overflow-x-auto">
-                            <table class="w-full report-table min-w-[800px]">
-                                <thead><tr><th class="text-left">Activity</th>${dates.map(d => `<th class="text-center">${d.label}<br>${d.date}</th>`).join('')}<th class="bg-indigo-800">Total</th></tr></thead>
-                                <tbody>`;
+                    <div class="mb-14">
+                        <div class="flex items-center gap-3 mb-6">
+                            <h3 class="bg-slate-900 px-8 py-3 rounded-2xl text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-xl">${m}</h3>
+                            <div class="h-[1px] flex-1 bg-slate-200"></div>
+                        </div>
+                        <div class="glass-card overflow-x-auto border-none shadow-sm">
+                            <table class="w-full min-w-[900px]">
+                                <thead><tr class="bg-slate-900 text-white"><th class="text-left p-5 text-[10px] font-black uppercase tracking-widest">Activity</th>${dates.map(d => `<th class="text-center p-5 text-[10px] font-black">${d.label}<br><span class="text-indigo-400">${d.date}</span></th>`).join('')}<th class="bg-indigo-600 p-5 text-[10px] font-black">TOTAL</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">`;
                 config[m].forEach(cat => {
                     let total = 0;
-                    html += `<tr><td class="font-bold text-slate-800 bg-slate-50/50">${cat.icon} ${cat.name}</td>`;
+                    html += `<tr class="hover:bg-slate-50/50"><td class="p-5 font-bold text-slate-700 text-xs">${cat.icon} ${cat.name}</td>`;
                     dates.forEach(d => {
                         const sum = logs.filter(l => l.date === d.str && l.category === cat.name).reduce((s,e) => s+e.val, 0);
                         total += sum;
-                        const valDisp = sum > 0 ? (cat.type === 'min' ? Math.floor(sum/60)+'h' : sum) : '--';
-                        html += `<td class="text-center font-bold ${sum > 0 ? 'text-indigo-600' : 'text-slate-200'}">${valDisp}</td>`;
+                        const valDisp = sum > 0 ? (cat.type === 'min' ? Math.floor(sum/60)+'h' : sum) : '—';
+                        html += `<td class="text-center p-5 font-bold text-xs ${sum > 0 ? 'text-indigo-600' : 'text-slate-200'}">${valDisp}</td>`;
                     });
                     const finalTotal = total > 0 ? (cat.type === 'min' ? Math.floor(total/60)+'h '+(total%60)+'m' : total) : '0';
-                    html += `<td class="text-center font-black bg-indigo-50 text-indigo-700">${finalTotal}</td></tr>`;
+                    html += `<td class="text-center p-5 font-black bg-indigo-50/50 text-indigo-700 text-xs">${finalTotal}</td></tr>`;
                 });
                 html += `</tbody></table></div></div>`;
             });
